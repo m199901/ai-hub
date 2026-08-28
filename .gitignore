@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment secrets
+.env
+.env.local
+*.env
+
+# User data
+data/
+*.json.bak
+
+# Logs and OS files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -1,0 +1,9 @@
+# ═══ إعداد نشر Railway (Nixpacks) ═══
+# يُخبر Railway بكيفية بناء وتشغيل التطبيق تلقائياً
+
+[build]
+  builder = "nixpacks"
+
+[deploy]
+  startCommand = "npm start"
+  healthcheckPath = "/"
