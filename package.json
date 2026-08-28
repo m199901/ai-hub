@@ -9,5 +9,9 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "nodemailer": "^9.0.6"
   }
 }
