@@ -2,12 +2,15 @@ require('dotenv').config();
 
 const http = require('node:http');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const nodemailer = require('nodemailer');
 
 const port = Number.parseInt(process.env.PORT || '3000', 10);
 const users = new Map();
 const verificationCodes = new Map();
 const sessions = new Map();
+const publicDirectory = path.join(__dirname, 'public');
 const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 const demoMode = !smtpConfigured;
 const mailTransport = smtpConfigured
@@ -64,9 +67,12 @@ function htmlPage(title, content, script = '') {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font-family:system-ui,sans-serif;max-width:620px;margin:40px auto;padding:20px;background:#f5f7fb;color:#172033}main{background:white;padding:28px;border-radius:12px;box-shadow:0 8px 28px #17203318}label,input,button{display:block;width:100%;box-sizing:border-box;margin:10px 0;padding:11px;font-size:1rem}button{cursor:pointer;background:#155eef;color:white;border:0;border-radius:6px}output{display:block;margin-top:16px}a{color:#155eef}</style></head><body><main>${content}</main><script>${script}</script></body></html>`;
 }
 
-function renderHome() {
-  const modeText = demoMode ? 'وضع التجربة: سيظهر كود التأكيد على الشاشة.' : 'سيصلك كود التأكيد عبر البريد الإلكتروني.';
-  return htmlPage('AI Hub Auth', `<h1>🛡️ AI Hub Auth</h1><p>${modeText}</p><h2>إنشاء حساب</h2><form id="register"><input name="email" type="email" placeholder="البريد الإلكتروني" required><input name="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" minlength="6" required><button>سجّل حسابًا</button></form><h2>تسجيل الدخول</h2><form id="login"><input name="email" type="email" placeholder="البريد الإلكتروني" required><input name="password" type="password" placeholder="كلمة المرور" required><button>تسجيل الدخول</button></form><output id="result" aria-live="polite"></output>`, `async function submit(form, url){const result=document.getElementById('result');const data=Object.fromEntries(new FormData(form));const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const body=await response.json();result.innerHTML=body.error||body.message||'';if(body.code)result.innerHTML+=' الكود: <strong>'+body.code+'</strong>';if(body.next)result.innerHTML+='<br><a href="'+body.next+'">متابعة</a>';if(response.ok&&url.endsWith('login'))location.href='/dashboard';}document.getElementById('register').onsubmit=e=>{e.preventDefault();submit(e.target,'/api/auth/register')};document.getElementById('login').onsubmit=e=>{e.preventDefault();submit(e.target,'/api/auth/login')};`);
+function servePublic(response, filename) {
+  fs.readFile(path.join(publicDirectory, filename), (error, content) => {
+    if (error) return sendJson(response, 404, { error: 'Not found' });
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    response.end(content);
+  });
 }
 
 function issueCode(email) {
@@ -82,16 +88,20 @@ async function sendVerification(email, code) {
 
 const server = http.createServer((request, response) => {
   const path = new URL(request.url, `http://${request.headers.host || 'localhost'}`).pathname;
-  if (request.method === 'GET' && path === '/') {
-    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    response.end(renderHome());
+  if (request.method === 'GET' && ['/','/login.html'].includes(path)) {
+    servePublic(response, 'login.html');
     return;
   }
-  if (request.method === 'GET' && path === '/dashboard') {
+  if (request.method === 'GET' && ['/dashboard', '/dashboard.html'].includes(path)) {
     const session = sessions.get(parseCookies(request).session);
     if (!session) return sendJson(response, 401, { error: 'يجب تسجيل الدخول أولًا.' });
-    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    response.end(htmlPage('لوحة AI Hub', `<h1>لوحة التحكم جاهزة</h1><p>مرحبًا بك، ${session.email}</p><p>تم تسجيل الدخول بنجاح.</p><a href="/">العودة</a>`));
+    servePublic(response, 'dashboard.html');
+    return;
+  }
+  if (request.method === 'GET' && path === '/api/auth/me') {
+    const session = sessions.get(parseCookies(request).session);
+    if (!session) return sendJson(response, 401, { error: 'يجب تسجيل الدخول أولًا.' });
+    sendJson(response, 200, { email: session.email });
     return;
   }
   if (request.method === 'GET' && path === '/api/health') return sendJson(response, 200, { name: 'ai-hub', status: 'ok', demoMode });

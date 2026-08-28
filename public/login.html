@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Hub | تسجيل الدخول</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 620px; margin: 40px auto; padding: 20px; background: #f5f7fb; color: #172033; }
+    main { background: white; padding: 28px; border-radius: 12px; box-shadow: 0 8px 28px #17203318; }
+    label, input, button { display: block; width: 100%; box-sizing: border-box; margin: 10px 0; padding: 11px; font-size: 1rem; }
+    button { cursor: pointer; background: #155eef; color: white; border: 0; border-radius: 6px; }
+    output { display: block; margin-top: 16px; }
+    a { color: #155eef; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AI Hub Auth</h1>
+    <p id="mode"></p>
+    <h2>إنشاء حساب</h2>
+    <form id="register">
+      <input name="email" type="email" placeholder="البريد الإلكتروني" required>
+      <input name="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" minlength="6" required>
+      <button>سجّل حسابًا</button>
+    </form>
+    <h2>تسجيل الدخول</h2>
+    <form id="login">
+      <input name="email" type="email" placeholder="البريد الإلكتروني" required>
+      <input name="password" type="password" placeholder="كلمة المرور" required>
+      <button>تسجيل الدخول</button>
+    </form>
+    <output id="result" aria-live="polite"></output>
+  </main>
+  <script>
+    fetch('/api/health').then(response => response.json()).then(body => {
+      document.getElementById('mode').textContent = body.demoMode
+        ? 'وضع التجربة: سيظهر كود التأكيد على الشاشة.'
+        : 'سيصلك كود التأكيد عبر البريد الإلكتروني.';
+    });
+    async function submitForm(form, url) {
+      const result = document.getElementById('result');
+      const data = Object.fromEntries(new FormData(form));
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const body = await response.json();
+      result.innerHTML = body.error || body.message || '';
+      if (body.code) result.innerHTML += ` الكود: <strong>${body.code}</strong>`;
+      if (body.next) result.innerHTML += `<br><a href="${body.next}">متابعة</a>`;
+      if (response.ok && url.endsWith('login')) location.href = '/dashboard';
+    }
+    document.getElementById('register').onsubmit = event => { event.preventDefault(); submitForm(event.target, '/api/auth/register'); };
+    document.getElementById('login').onsubmit = event => { event.preventDefault(); submitForm(event.target, '/api/auth/login'); };
+  </script>
+</body>
+</html>
